@@ -235,7 +235,7 @@ class RealmPacketHandler(realmConnectionCallback: RealmConnectionCallback)
     } else if (realms.length > 1) {
       logger.error("Too many realms returned. Something is very wrong! This should never happen.")
     } else {
-      val splt = realms.head.address.split(":")
+      val splt = realms.head.address.split(":").map(_.trim) // some servers have whitespace typos in the ip address
       val port = splt(1).toInt & 0xFFFF // some servers "overflow" the port on purpose to dissuade rudimentary bots
       realmConnectionCallback.success(splt(0), port, realms.head.name, realms.head.realmId, sessionKey)
     }
