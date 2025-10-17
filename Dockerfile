@@ -16,7 +16,7 @@ COPY src ./src
 RUN mvn clean package -DskipTests
 
 # Stage 2: Runtime image
-FROM eclipse-temurin:11-jre-alpine
+FROM eclipse-temurin:11-jre
 
 # Set working directory
 WORKDIR /app
@@ -54,10 +54,10 @@ ENV WOW_CHARACTER=""
 # Optional: Add a healthcheck (adjust if your app exposes any endpoint)
 # Since this is a chat bot without HTTP endpoints, we'll check if the process is running
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD pgrep -f wowchat.jar || exit 1
+  CMD ps aux | grep -v grep | grep wowchat.jar || exit 1
 
 # Create a non-root user for security
-RUN addgroup -S wowchat && adduser -S wowchat -G wowchat && \
+RUN groupadd -r wowchat && useradd -r -g wowchat wowchat && \
     chown -R wowchat:wowchat /app
 USER wowchat
 
