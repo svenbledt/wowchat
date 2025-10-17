@@ -16,7 +16,7 @@ import scala.collection.mutable.ListBuffer
 import scala.util.Random
 
 case class Player(name: String, charClass: Byte)
-case class GuildMember(name: String, isOnline: Boolean, charClass: Byte, level: Byte, zoneId: Int, lastLogoff: Float)
+case class GuildMember(name: String, isOnline: Boolean, charClass: Byte, level: Byte, zoneId: Int, lastLogoff: Float, publicNote: String = "")
 case class ChatMessage(guid: Long, tp: Byte, message: String, channel: Option[String] = None)
 case class NameQueryMessage(guid: Long, name: String, charClass: Byte)
 case class AuthChallengeMessage(sessionKey: Array[Byte], byteBuf: ByteBuf)
@@ -531,6 +531,7 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
     guildRoster.clear
     guildRoster ++= parseGuildRoster(msg)
     updateGuildiesOnline
+    Global.discord.syncGuildRoles(guildRoster.toMap)
   }
 
   protected def parseGuildRoster(msg: Packet): Map[Long, GuildMember] = {
@@ -552,10 +553,10 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
       } else {
         0
       }
-      msg.skipString
-      msg.skipString
+      val publicNote = msg.readString
+      msg.skipString // officer note
 
-      guid -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff)
+      guid -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff, publicNote)
     }).toMap
   }
 
@@ -758,7 +759,7 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
 
   private def handle_SMSG_WARDEN_DATA(msg: Packet): Unit = {
     if (Global.config.wow.platform == Platform.Windows) {
-      logger.error("WARDEN ON WINDOWS IS NOT SUPPORTED! BOT WILL SOON DISCONNECT! TRY TO USE PLATFORM MAC!")
+      // logger.error("WARDEN ON WINDOWS IS NOT SUPPORTED! BOT WILL SOON DISCONNECT! TRY TO USE PLATFORM MAC!")
       return
     }
 

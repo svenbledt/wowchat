@@ -1,0 +1,55 @@
+services:
+  wowchat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: wowchat
+    restart: unless-stopped
+
+    # Environment variables - Set these values or use a .env file
+    environment:
+      # Discord Configuration
+      - DISCORD_TOKEN=${DISCORD_TOKEN}
+      - GUILD_CHAT_CHANNEL_ID=${GUILD_CHAT_CHANNEL_ID}
+      - OFFICER_CHAT_CHANNEL_ID=${OFFICER_CHAT_CHANNEL_ID}
+      - GUILD_ROLE_SYNC_ENABLED=${GUILD_ROLE_SYNC_ENABLED}
+      - GUILD_ROLE_ID=${GUILD_ROLE_ID}
+
+      - WOW_PLATFORM=${WOW_PLATFORM:-Mac}
+      - ITEM_DATABASE=${ITEM_DATABASE:-"https://www.wowhead.com/wotlk/"}
+      # WoW Server Configuration
+      - WOW_VERSION=${WOW_VERSION:-3.3.5}
+      - WOW_REALMLIST=${WOW_REALMLIST:-logon.stormforge.gg}
+      - WOW_REALM=${WOW_REALM:-Frostmourne}
+
+      # WoW Account Configuration
+      - WOW_ACCOUNT=${WOW_ACCOUNT}
+      - WOW_PASSWORD=${WOW_PASSWORD}
+      - WOW_CHARACTER=${WOW_CHARACTER}
+
+    # Optional: Mount custom configuration file
+    # Note: Config is already in the image, only uncomment if you need to override
+    # volumes:
+    #   - ./wowchat.conf:/app/wowchat.conf:ro
+      # Optional: Mount logs directory if you want to persist logs
+      # - ./logs:/app/logs
+
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: "1.0"
+          memory: 512M
+        reservations:
+          cpus: "0.5"
+          memory: 256M
+
+    # Network mode (change if needed)
+    network_mode: bridge
+
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"

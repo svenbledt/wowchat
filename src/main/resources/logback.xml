@@ -6,17 +6,26 @@
         </encoder>
     </appender>
 
-    <logger name="net.dv8tion.jda.core.requests.Requester" level="INFO" />
+    <!-- JDA Discord Library -->
+    <logger name="net.dv8tion.jda" level="WARN" />
 
-    <logger name="wowchat.game.GamePacketEncoder" level="INFO" />
-    <logger name="wowchat.game.GamePacketEncoderCataclysm" level="INFO" />
-    <logger name="wowchat.game.GamePacketEncoderMoP" level="INFO" />
+    <!-- Netty -->
+    <logger name="io.netty" level="WARN" />
 
-    <logger name="wowchat.game.GamePacketDecoder" level="INFO" />
-    <logger name="wowchat.game.GamePacketDecoderWotLK" level="INFO" />
-    <logger name="wowchat.game.GamePacketDecoderCataclysm" level="INFO" />
-    <logger name="wowchat.game.GamePacketDecoderMoP" level="INFO" />
+    <!-- Suppress packet encoder/decoder debug logs -->
+    <logger name="wowchat.game.GamePacketDecoder" level="WARN" />
+    <logger name="wowchat.game.GamePacketDecoderWotLK" level="WARN" />
+    <logger name="wowchat.game.GamePacketDecoderTBC" level="WARN" />
+    <logger name="wowchat.game.GamePacketDecoderCataclysm" level="WARN" />
+    <logger name="wowchat.game.GamePacketDecoderMoP" level="WARN" />
+    <logger name="wowchat.game.GamePacketEncoder" level="WARN" />
+    <logger name="wowchat.game.GamePacketEncoderCataclysm" level="WARN" />
+    <logger name="wowchat.game.GamePacketEncoderMoP" level="WARN" />
 
+    <!-- Suppress other wowchat debug logs -->
+    <logger name="wowchat" level="WARN" />
+
+    <!-- Root logger - only show INFO and above -->
     <root level="INFO">
         <appender-ref ref="STDOUT" />
     </root>

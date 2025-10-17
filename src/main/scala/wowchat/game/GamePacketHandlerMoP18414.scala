@@ -658,14 +658,14 @@ class GamePacketHandlerMoP18414(realmId: Int, realmName: String, sessionKey: Arr
       msg.byteBuf.skipBytes(4) // rank
       msg.byteBuf.skipBytes(4) // realm id
       msg.readXorByteSeq(guids(i), 5, 7)
-      msg.byteBuf.skipBytes(pNoteLengths(i)) // public note
+      val publicNote = msg.byteBuf.readCharSequence(pNoteLengths(i), Charset.forName("UTF-8")).toString
       msg.readXorByteSeq(guids(i), 4)
       msg.byteBuf.skipBytes(8) // weekly activity
       msg.byteBuf.skipBytes(4) // achievement points
       msg.readXorByteSeq(guids(i), 6, 1, 2)
       val isOnline = (flags & 0x01) == 0x01
 
-      ByteUtils.bytesToLongLE(guids(i)) -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff)
+      ByteUtils.bytesToLongLE(guids(i)) -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff, publicNote)
     }).toMap
 
     msg.byteBuf.skipBytes(4) // accounts number

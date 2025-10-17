@@ -115,12 +115,38 @@ Even though this bot does not do anything malicious, some servers may not like a
    * Setup the bot with the correct Discord roles/permissions to enter your desired channels.
 
 ## Run
+
+### Option 1: Docker (Recommended for Production)
+🐳 **Deploy with Docker or Coolify**
+
+**Required Environment Variables:**
+- `DISCORD_TOKEN` - Your Discord bot token
+- `GUILD_CHAT_CHANNEL_ID` - Discord channel for guild chat (name or ID)
+- `OFFICER_CHAT_CHANNEL_ID` - Discord channel for officer chat
+- `WOW_PLATFORM` - Platform to run on: Windows / Mac
+- `ITEM_DATABASE` - The Database to get item data from
+- `WOW_VERSION` - Server version (1.12.1, 2.4.3, 3.3.5, 4.3.4, or 5.4.8)
+- `WOW_REALMLIST` - Server address (e.g., logon.server.com)
+- `WOW_REALM` - Exact realm name from character selection
+- `WOW_ACCOUNT` - Bot account username
+- `WOW_PASSWORD` - Bot account password
+- `WOW_CHARACTER` - Character name
+
+**Quick start:**
+```bash
+# Create .env file with your values (see docker-compose.yml for template)
+docker-compose up -d
+```
+
+**For Coolify:** Add application, set environment variables in Environment tab, deploy!
+
+### Option 2: Pre-built Binary
 1. Download the latest ready-made binary from github releases: https://github.com/fjaros/wowchat/releases
    * **Make sure you have a Java Runtime Environment (JRE) 1.8 or higher installed on your system!**
    * **On Windows**: Edit wowchat.conf as above and run `run.bat`
    * **On Mac/Linux**: Edit wowchat.conf as above and run `run.sh`
 
-OR to compile yourself:
+### Option 3: Compile from Source
 1. WoW Chat is written in Scala and compiles to a Java executable using [maven](https://maven.apache.org).
 2. It uses Java JDK 1.8 and Scala 2.12.12.
 3. Run `mvn clean package` which will produce a file in the target folder called `wowchat-1.3.8.zip`

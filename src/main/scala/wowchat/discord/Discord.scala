@@ -109,6 +109,71 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
     changeStatus(ActivityType.CUSTOM_STATUS, message)
   }
 
+  def syncGuildRoles(guildRoster: Map[Long, wowchat.game.GuildMember]): Unit = {
+    Global.config.guildConfig.roleSyncConfig.foreach { roleSyncConfig =>
+      if (!roleSyncConfig.enabled) {
+        return
+      }
+
+      roleSyncConfig.roleId.foreach { roleIdStr =>
+        try {
+          val pattern = roleSyncConfig.pattern.r
+          val guilds = jda.getGuilds.asScala
+
+          guilds.foreach { guild =>
+            val role = guild.getRoleById(roleIdStr)
+            if (role == null) {
+              logger.warn(s"Role with ID $roleIdStr not found in Discord guild ${guild.getName}")
+              return
+            }
+
+            guildRoster.values.foreach { member =>
+              if (member.publicNote.nonEmpty) {
+                try {
+                  // Try all matches in the public note, not just the first one
+                  val matches = pattern.findAllMatchIn(member.publicNote)
+                  val discordMembers = guild.getMembers.asScala
+                  var foundMatch = false
+
+                  matches.foreach { m =>
+                    if (!foundMatch) {
+                      // Get the username from group 1
+                      val discordUsername = if (m.groupCount >= 1 && m.group(1) != null) {
+                        m.group(1).stripPrefix("@").toLowerCase
+                      } else {
+                        ""
+                      }
+
+                      if (discordUsername.nonEmpty) {
+                        // Find Discord member by username
+                        discordMembers.find(_.getUser.getName.toLowerCase == discordUsername).foreach { discordMember =>
+                          foundMatch = true
+                          // Check if member already has the role
+                          if (!discordMember.getRoles.asScala.exists(_.getId == roleIdStr)) {
+                            guild.addRoleToMember(discordMember, role).queue(
+                              _ => logger.info(s"Assigned role ${role.getName} to Discord user ${discordMember.getUser.getName} (matched with WoW character ${member.name})"),
+                              error => logger.error(s"Failed to assign role to ${discordMember.getUser.getName}: ${error.getMessage}")
+                            )
+                          }
+                        }
+                      }
+                    }
+                  }
+                } catch {
+                  case e: Exception =>
+                    logger.error(s"Error processing public note for ${member.name}: ${e.getMessage}")
+                }
+              }
+            }
+          }
+        } catch {
+          case e: Exception =>
+            logger.error(s"Error in syncGuildRoles: ${e.getMessage}", e)
+        }
+      }
+    }
+  }
+
   def sendMessageFromWow(from: Option[String], message: String, wowType: Byte, wowChannel: Option[String]): Unit = {
     Global.wowToDiscord.get((wowType, wowChannel.map(_.toLowerCase))).foreach(discordChannels => {
       val parsedLinks = messageResolver.resolveEmojis(messageResolver.stripColorCoding(messageResolver.resolveLinks(message)))
@@ -365,7 +430,143 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
   }
 
   def sanitizeMessage(message: String): String = {
-    EmojiParser.parseToAliases(message, EmojiParser.FitzpatrickAction.REMOVE)
+    val withAliases = EmojiParser.parseToAliases(message, EmojiParser.FitzpatrickAction.REMOVE)
+    convertEmojisToTextEmoticons(withAliases)
+  }
+
+  // Convert Discord emoji codes to text emoticons for in-game chat
+  def convertEmojisToTextEmoticons(message: String): String = {
+    val emojiMap = Map(
+      // Happy/Positive emotions
+      ":slightly_smiling:" -> ":)",
+      ":smile:" -> ":D",
+      ":grinning:" -> ":D",
+      ":smiley:" -> ":)",
+      ":laughing:" -> ":D",
+      ":satisfied:" -> ":D",
+      ":joy:" -> "xD",
+      ":rofl:" -> "ROFL",
+      ":relaxed:" -> ":)",
+      ":blush:" -> "^^",
+      ":innocent:" -> "O:)",
+      ":smiling_face_with_3_hearts:" -> "<3",
+      ":heart:" -> "<3",
+      ":kissing_heart:" -> ":*",
+      ":kissing:" -> ":*",
+      ":wink:" -> ";)",
+      ":stuck_out_tongue:" -> ":P",
+      ":stuck_out_tongue_winking_eye:" -> ";P",
+      ":stuck_out_tongue_closed_eyes:" -> "xP",
+      ":zany_face:" -> ":P",
+      ":yum:" -> ":P",
+      
+      // Sad/Negative emotions
+      ":disappointed:" -> ":(",
+      ":worried:" -> ":(",
+      ":cry:" -> ":'(",
+      ":sob:" -> "T_T",
+      ":frowning:" -> ":(",
+      ":anguished:" -> "D:",
+      ":pleading_face:" -> ":(",
+      ":frowning_face:" -> ":(",
+      ":slightly_frowning_face:" -> ":(",
+      ":confused:" -> ":/",
+      ":upside_down_face:" -> "(:",
+      ":money_mouth_face:" -> "$_$",
+      
+      // Surprise/Shock
+      ":open_mouth:" -> ":O",
+      ":hushed:" -> ":O",
+      ":astonished:" -> ":O",
+      ":flushed:" -> "O_O",
+      ":scream:" -> "D:",
+      ":fearful:" -> "D:",
+      ":cold_sweat:" -> "o_O",
+      ":disappointed_relieved:" -> "u_u",
+      ":sweat:" -> "^^'",
+      
+      // Neutral/Other
+      ":neutral_face:" -> ":|",
+      ":expressionless:" -> "-_-",
+      ":no_mouth:" -> ":-",
+      ":thinking:" -> "o.O",
+      ":thinking_face:" -> "o.O",
+      ":face_with_raised_eyebrow:" -> "o.O",
+      ":unamused:" -> "-_-",
+      ":rolling_eyes:" -> "-_-",
+      ":grimacing:" -> ":S",
+      ":lying_face:" -> ":L",
+      ":relieved:" -> "phew",
+      ":pensive:" -> ":((",
+      ":sleepy:" -> "zzz",
+      ":sleeping:" -> "zzz",
+      ":drooling_face:" -> ":P",
+      ":sleeping:" -> "Zzz",
+      
+      // Cool/Sunglasses
+      ":sunglasses:" -> "B)",
+      ":smirk:" -> ";)",
+      ":nerd_face:" -> "8)",
+      
+      // Angry
+      ":angry:" -> ">:(",
+      ":rage:" -> ">:O",
+      ":face_with_symbols_on_mouth:" -> "@#$%!",
+      ":triumph:" -> ">:(",
+      
+      // Love
+      ":heart:" -> "<3",
+      ":heartbeat:" -> "<3",
+      ":heartpulse:" -> "<3",
+      ":sparkling_heart:" -> "<3",
+      ":two_hearts:" -> "<3<3",
+      ":revolving_hearts:" -> "<3",
+      ":cupid:" -> "<3",
+      ":gift_heart:" -> "<3",
+      ":broken_heart:" -> "</3",
+      
+      // Symbols
+      ":thumbsup:" -> "+1",
+      ":+1:" -> "+1",
+      ":thumbsdown:" -> "-1",
+      ":-1:" -> "-1",
+      ":ok_hand:" -> "OK",
+      ":v:" -> "V",
+      ":clap:" -> "*clap*",
+      ":wave:" -> "*wave*",
+      ":point_right:" -> "->",
+      ":point_left:" -> "<-",
+      ":point_up:" -> "^",
+      ":point_down:" -> "v",
+      
+      // Misc
+      ":100:" -> "100%",
+      ":fire:" -> "*fire*",
+      ":star:" -> "*",
+      ":star2:" -> "*",
+      ":sparkles:" -> "*sparkle*",
+      ":tada:" -> "*party*",
+      ":skull:" -> "X_X",
+      ":skull_and_crossbones:" -> "X_X",
+      ":poop:" -> "poop",
+      ":hankey:" -> "poop",
+      ":ghost:" -> "BOO!",
+      ":alien:" -> "ET",
+      ":robot:" -> "[O_O]",
+      ":jack_o_lantern:" -> "o'-'o",
+      
+      // Actions/Gestures
+      ":pray:" -> "*pray*",
+      ":handshake:" -> "*handshake*",
+      ":muscle:" -> "*flex*",
+      ":raised_hand:" -> "o/",
+      ":vulcan_salute:" -> "\\\\//",
+      ":shrug:" -> "¯\\_(ツ)_/¯"
+    )
+    
+    emojiMap.foldLeft(message) { case (msg, (emoji, emoticon)) =>
+      msg.replace(emoji, emoticon)
+    }
   }
 
 }

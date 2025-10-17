@@ -149,10 +149,10 @@ class GamePacketHandlerTBC(realmId: Int, realmName: String, sessionKey: Array[By
       } else {
         0
       }
-      msg.skipString
-      msg.skipString
+      val publicNote = msg.readString
+      msg.skipString // officer note
 
-      guid -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff)
+      guid -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff, publicNote)
     }).toMap
   }
 

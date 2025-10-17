@@ -15,8 +15,9 @@ case class WowChatConfig(discord: DiscordConfig, wow: Wow, guildConfig: GuildCon
 case class DiscordConfig(token: String, enableDotCommands: Boolean, dotCommandsWhitelist: Set[String], enableCommandsChannels: Set[String], enableTagFailedNotifications: Boolean, itemDatabase: Option[String])
 case class Wow(locale: String, platform: Platform.Value, realmBuild: Option[Int], gameBuild: Option[Int], realmlist: RealmListConfig, account: Array[Byte], password: String, character: String, enableServerMotd: Boolean)
 case class RealmListConfig(name: String, host: String, port: Int)
-case class GuildConfig(notificationConfigs: Map[String, GuildNotificationConfig])
+case class GuildConfig(notificationConfigs: Map[String, GuildNotificationConfig], roleSyncConfig: Option[GuildRoleSyncConfig])
 case class GuildNotificationConfig(enabled: Boolean, format: String, channel: Option[String])
+case class GuildRoleSyncConfig(enabled: Boolean, roleId: Option[String], pattern: String)
 case class ChannelConfig(chatDirection: ChatDirection, wow: WowChannelConfig, discord: DiscordChannelConfig)
 case class WowChannelConfig(id: Option[Int], tp: Byte, channel: Option[String] = None, format: String, filters: Option[FiltersConfig])
 case class DiscordChannelConfig(channel: String, format: String, filters: Option[FiltersConfig])
@@ -143,8 +144,16 @@ object WowChatConfig extends GamePackets {
     guildConf.fold({
       GuildConfig(defaults.mapValues {
         case (enabled, format) => GuildNotificationConfig(enabled, format, None)
-      })
+      }, None)
     })(guildConf => {
+      val roleSyncConf = getConfigOpt(guildConf, "role_sync").map(conf => {
+        GuildRoleSyncConfig(
+          getOpt[Boolean](conf, "enabled").getOrElse(false),
+          getOpt[String](conf, "role_id"),
+          getOpt[String](conf, "pattern").getOrElse("(?:^|(?<=\\s))@?([a-zA-Z0-9_]{2,32})(?=$|\\s)")
+        )
+      })
+      
       GuildConfig(
         defaults.keysIterator.map(key => {
           val conf = getConfigOpt(guildConf, key)
@@ -157,7 +166,8 @@ object WowChatConfig extends GamePackets {
             )
           })
         })
-          .toMap
+          .toMap,
+        roleSyncConf
       )
     })
   }

@@ -247,7 +247,7 @@ class GamePacketHandlerCataclysm15595(realmId: Int, realmName: String, sessionKe
       msg.byteBuf.skipBytes(8) // total activity (0)
       msg.readXorByteSeq(guids(i), 7)
       msg.byteBuf.skipBytes(4) // guild rep?
-      msg.byteBuf.skipBytes(pNoteLengths(i)) // public note
+      val publicNote = msg.byteBuf.readCharSequence(pNoteLengths(i), Charset.forName("UTF-8")).toString
       msg.readXorByteSeq(guids(i), 3)
       val level = msg.byteBuf.readByte
       msg.byteBuf.skipBytes(4) // unkn
@@ -260,7 +260,7 @@ class GamePacketHandlerCataclysm15595(realmId: Int, realmName: String, sessionKe
       val name = msg.byteBuf.readCharSequence(nameLengths(i), Charset.forName("UTF-8")).toString
       val isOnline = (flags & 0x01) == 0x01
 
-      ByteUtils.bytesToLongLE(guids(i)) -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff)
+      ByteUtils.bytesToLongLE(guids(i)) -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff, publicNote)
     }).toMap
 
     msg.byteBuf.skipBytes(gInfoLength)
