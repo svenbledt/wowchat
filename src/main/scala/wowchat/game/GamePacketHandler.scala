@@ -305,7 +305,7 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
     } else {
       logger.error(AuthResponseCodes.getMessage(code))
       ctx.foreach(_.close)
-      gameEventCallback.error
+      gameEventCallback.disconnected
     }
   }
 

@@ -129,8 +129,17 @@ class RealmPacketHandler(realmConnectionCallback: RealmConnectionCallback)
     val result = msg.byteBuf.readByte
     if (!RealmPackets.AuthResult.isSuccess(result)) {
       logger.error(RealmPackets.AuthResult.getMessage(result))
+      expectedDisconnect = true
       ctx.get.close
-      realmConnectionCallback.error
+      // Most auth challenge failures should trigger reconnection, except for permanent config issues
+      if (result == RealmPackets.AuthResult.WOW_FAIL_VERSION_INVALID || 
+          result == RealmPackets.AuthResult.WOW_FAIL_VERSION_UPDATE) {
+        // These are configuration issues that won't resolve with reconnection
+        realmConnectionCallback.error
+      } else {
+        // Most other errors could be temporary, try reconnecting
+        realmConnectionCallback.disconnected
+      }
       return
     }
 
@@ -191,11 +200,15 @@ class RealmPacketHandler(realmConnectionCallback: RealmConnectionCallback)
       logger.error(RealmPackets.AuthResult.getMessage(result))
       expectedDisconnect = true
       ctx.get.close
-      if (result == RealmPackets.AuthResult.WOW_FAIL_UNKNOWN_ACCOUNT) {
-        // seems sometimes this error happens even on a legit connect. so just run regular reconnect loop
-        realmConnectionCallback.disconnected
-      } else {
+      // Many auth errors can be temporary, attempt reconnection for most cases
+      if (result == RealmPackets.AuthResult.WOW_FAIL_INCORRECT_PASSWORD || 
+          result == RealmPackets.AuthResult.WOW_FAIL_BANNED ||
+          result == RealmPackets.AuthResult.WOW_FAIL_SUSPENDED) {
+        // These are permanent issues that won't resolve with reconnection
         realmConnectionCallback.error
+      } else {
+        // Most other errors including WOW_FAIL_UNKNOWN_ACCOUNT, WOW_FAIL_ALREADY_ONLINE, etc. could be temporary
+        realmConnectionCallback.disconnected
       }
       return
     }
@@ -232,15 +245,21 @@ class RealmPacketHandler(realmConnectionCallback: RealmConnectionCallback)
       logger.error(s"Realm $configRealm not found!")
       logger.error(s"${parsedRealmList.length} possible realms:")
       parsedRealmList.foreach(realm => logger.error(realm.name))
+      expectedDisconnect = true
+      ctx.get.close
+      realmConnectionCallback.disconnected
     } else if (realms.length > 1) {
       logger.error("Too many realms returned. Something is very wrong! This should never happen.")
+      expectedDisconnect = true
+      ctx.get.close
+      realmConnectionCallback.disconnected
     } else {
       val splt = realms.head.address.split(":").map(_.trim) // some servers have whitespace typos in the ip address
       val port = splt(1).toInt & 0xFFFF // some servers "overflow" the port on purpose to dissuade rudimentary bots
       realmConnectionCallback.success(splt(0), port, realms.head.name, realms.head.realmId, sessionKey)
+      expectedDisconnect = true
+      ctx.get.close
     }
-    expectedDisconnect = true
-    ctx.get.close
   }
 
   protected def parseRealmList(msg: Packet): Seq[RealmList] = {
