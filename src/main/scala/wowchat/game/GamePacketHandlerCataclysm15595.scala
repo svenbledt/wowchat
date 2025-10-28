@@ -26,10 +26,15 @@ class GamePacketHandlerCataclysm15595(realmId: Int, realmName: String, sessionKe
     })
     writeBits(out, utf8MessageBytes.length, 9)
     flushBits(out)
-    // note for whispers (if the bot ever supports them, the order is opposite, person first then msg)
-    out.writeBytes(utf8MessageBytes)
-    if (utf8TargetBytes.isDefined) {
+    // For whispers, write target first, then message
+    if (tp == ChatEvents.CHAT_MSG_WHISPER && utf8TargetBytes.isDefined) {
       out.writeBytes(utf8TargetBytes.get)
+      out.writeBytes(utf8MessageBytes)
+    } else {
+      out.writeBytes(utf8MessageBytes)
+      if (utf8TargetBytes.isDefined) {
+        out.writeBytes(utf8TargetBytes.get)
+      }
     }
     Packet(getChatPacketFromType(tp), out)
   }
@@ -255,12 +260,12 @@ class GamePacketHandlerCataclysm15595(realmId: Int, realmName: String, sessionKe
       msg.byteBuf.skipBytes(1) // unkn
       msg.readXorByteSeq(guids(i), 1)
       val lastLogoff = msg.byteBuf.readFloatLE
-      msg.byteBuf.skipBytes(oNoteLengths(i)) // officer note
+      val officerNote = msg.byteBuf.readCharSequence(oNoteLengths(i), Charset.forName("UTF-8")).toString
       msg.readXorByteSeq(guids(i), 6)
       val name = msg.byteBuf.readCharSequence(nameLengths(i), Charset.forName("UTF-8")).toString
       val isOnline = (flags & 0x01) == 0x01
 
-      ByteUtils.bytesToLongLE(guids(i)) -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff, publicNote)
+      ByteUtils.bytesToLongLE(guids(i)) -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff, publicNote, officerNote)
     }).toMap
 
     msg.byteBuf.skipBytes(gInfoLength)

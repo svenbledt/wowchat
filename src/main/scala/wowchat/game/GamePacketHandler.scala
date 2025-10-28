@@ -16,7 +16,7 @@ import scala.collection.mutable.ListBuffer
 import scala.util.Random
 
 case class Player(name: String, charClass: Byte)
-case class GuildMember(name: String, isOnline: Boolean, charClass: Byte, level: Byte, zoneId: Int, lastLogoff: Float, publicNote: String = "")
+case class GuildMember(name: String, isOnline: Boolean, charClass: Byte, level: Byte, zoneId: Int, lastLogoff: Float, publicNote: String = "", officerNote: String = "")
 case class ChatMessage(guid: Long, tp: Byte, message: String, channel: Option[String] = None)
 case class NameQueryMessage(guid: Long, name: String, charClass: Byte)
 case class AuthChallengeMessage(sessionKey: Array[Byte], byteBuf: ByteBuf)
@@ -524,6 +524,28 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
       Global.discord.sendGuildNotification(eventConfigKey, formatted)
     }
 
+    // Send welcome message to new guild members
+    if (event == GuildEvents.GE_JOINED) {
+      Global.config.guildConfig.welcomeMessage.foreach { welcomeConfig =>
+        if (welcomeConfig.enabled && messages.nonEmpty) {
+          val newMemberName = messages.head
+          val welcomeMsg = welcomeConfig.message.replace("%user", newMemberName)
+          
+          // Check if bot meets minimum level requirement for whispers
+          val botLevel: Int = guildRoster.find(_._2.name.equalsIgnoreCase(Global.config.wow.character))
+            .map(_._2.level.toInt)
+            .getOrElse(0)
+          
+          if (botLevel >= welcomeConfig.minLevel) {
+            sendMessageToWow(ChatEvents.CHAT_MSG_WHISPER, welcomeMsg, Some(newMemberName))
+            logger.info(s"Sent welcome whisper to $newMemberName: $welcomeMsg")
+          } else {
+            logger.warn(s"Cannot send welcome whisper to $newMemberName: Bot level is $botLevel, minimum level ${welcomeConfig.minLevel} is required for whispers")
+          }
+        }
+      }
+    }
+
     updateGuildRoster
   }
 
@@ -554,9 +576,9 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
         0
       }
       val publicNote = msg.readString
-      msg.skipString // officer note
+      val officerNote = msg.readString
 
-      guid -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff, publicNote)
+      guid -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff, publicNote, officerNote)
     }).toMap
   }
 

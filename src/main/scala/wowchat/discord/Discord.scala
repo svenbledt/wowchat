@@ -111,6 +111,7 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
 
   def syncGuildRoles(guildRoster: Map[Long, wowchat.game.GuildMember]): Unit = {
     Global.config.guildConfig.roleSyncConfig.foreach { roleSyncConfig =>
+      // Only sync roles if enabled
       if (!roleSyncConfig.enabled) {
         return
       }
@@ -127,12 +128,16 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
               return
             }
 
+            val discordMembers = guild.getMembers.asScala
+            // Keep track of Discord users who should have the role based on officer notes
+            val discordUsersWithRole = mutable.Set.empty[String]
+
+            // Add roles to Discord members found in officer notes
             guildRoster.values.foreach { member =>
-              if (member.publicNote.nonEmpty) {
+              if (member.officerNote.nonEmpty) {
                 try {
-                  // Try all matches in the public note, not just the first one
-                  val matches = pattern.findAllMatchIn(member.publicNote)
-                  val discordMembers = guild.getMembers.asScala
+                  // Try all matches in the officer note, not just the first one
+                  val matches = pattern.findAllMatchIn(member.officerNote)
                   var foundMatch = false
 
                   matches.foreach { m =>
@@ -148,11 +153,13 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
                         // Find Discord member by username
                         discordMembers.find(_.getUser.getName.toLowerCase == discordUsername).foreach { discordMember =>
                           foundMatch = true
+                          val userName = discordMember.getUser.getName
+                          discordUsersWithRole += discordUsername
                           // Check if member already has the role
                           if (!discordMember.getRoles.asScala.exists(_.getId == roleIdStr)) {
                             guild.addRoleToMember(discordMember, role).queue(
-                              _ => logger.info(s"Assigned role ${role.getName} to Discord user ${discordMember.getUser.getName} (matched with WoW character ${member.name})"),
-                              error => logger.error(s"Failed to assign role to ${discordMember.getUser.getName}: ${error.getMessage}")
+                              _ => logger.info(s"Assigned role ${role.getName} to Discord user $userName (matched with WoW character ${member.name})"),
+                              error => logger.error(s"Failed to assign role to $userName: ${error.getMessage}")
                             )
                           }
                         }
@@ -161,8 +168,21 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
                   }
                 } catch {
                   case e: Exception =>
-                    logger.error(s"Error processing public note for ${member.name}: ${e.getMessage}")
+                    logger.error(s"Error processing officer note for ${member.name}: ${e.getMessage}")
                 }
+              }
+            }
+
+            // Remove role from Discord members who don't have their tag in any officer note
+            discordMembers.foreach { discordMember =>
+              val userName = discordMember.getUser.getName.toLowerCase
+              val hasRole = discordMember.getRoles.asScala.exists(_.getId == roleIdStr)
+              
+              if (hasRole && !discordUsersWithRole.contains(userName)) {
+                guild.removeRoleFromMember(discordMember, role).queue(
+                  _ => logger.info(s"Removed role ${role.getName} from Discord user ${discordMember.getUser.getName} (not found in officer notes)"),
+                  error => logger.error(s"Failed to remove role from ${discordMember.getUser.getName}: ${error.getMessage}")
+                )
               }
             }
           }

@@ -65,10 +65,15 @@ class GamePacketHandlerMoP18414(realmId: Int, realmName: String, sessionKey: Arr
       writeBits(out, utf8TargetBytes.get.length, 9)
     }
     flushBits(out)
-    // note for whispers (if the bot ever supports them, the order is opposite, person first then msg
-    out.writeBytes(utf8MessageBytes)
-    if (utf8TargetBytes.isDefined) {
+    // For whispers, write target first, then message
+    if (tp == ChatEvents.CHAT_MSG_WHISPER && utf8TargetBytes.isDefined) {
       out.writeBytes(utf8TargetBytes.get)
+      out.writeBytes(utf8MessageBytes)
+    } else {
+      out.writeBytes(utf8MessageBytes)
+      if (utf8TargetBytes.isDefined) {
+        out.writeBytes(utf8TargetBytes.get)
+      }
     }
     Packet(getChatPacketFromType(tp), out)
   }
@@ -652,7 +657,7 @@ class GamePacketHandlerMoP18414(realmId: Int, realmName: String, sessionKey: Arr
       msg.byteBuf.skipBytes(4) // rep cap
       msg.readXorByteSeq(guids(i), 3)
       msg.byteBuf.skipBytes(8) // total activity
-      msg.byteBuf.skipBytes(oNoteLengths(i)) // officer note
+      val officerNote = msg.byteBuf.readCharSequence(oNoteLengths(i), Charset.forName("UTF-8")).toString
       val lastLogoff = msg.byteBuf.readFloatLE
       msg.byteBuf.skipBytes(1) // gender? always 0?
       msg.byteBuf.skipBytes(4) // rank
@@ -665,7 +670,7 @@ class GamePacketHandlerMoP18414(realmId: Int, realmName: String, sessionKey: Arr
       msg.readXorByteSeq(guids(i), 6, 1, 2)
       val isOnline = (flags & 0x01) == 0x01
 
-      ByteUtils.bytesToLongLE(guids(i)) -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff, publicNote)
+      ByteUtils.bytesToLongLE(guids(i)) -> GuildMember(name, isOnline, charClass, level, zoneId, lastLogoff, publicNote, officerNote)
     }).toMap
 
     msg.byteBuf.skipBytes(4) // accounts number
