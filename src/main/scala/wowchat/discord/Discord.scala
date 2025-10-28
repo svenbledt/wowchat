@@ -368,8 +368,13 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
       return
     }
 
-    // ignore messages from non-text channels
+    // ignore messages from non-text channels and non-guild channels
     if (event.getChannelType != ChannelType.TEXT) {
+      return
+    }
+    
+    // ignore messages from non-guild channels (e.g., DMs)
+    if (!event.isFromGuild) {
       return
     }
 
@@ -382,7 +387,15 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
     val channel = event.getChannel
     val channelId = channel.getId
     val channelName = event.getChannel.getName.toLowerCase
-    val effectiveName = sanitizeName(event.getMember.getEffectiveName)
+    
+    // Handle case where getMember() can be null (e.g., when member has left the guild)
+    val member = event.getMember
+    if (member == null) {
+      logger.debug("Skipping message: member is null (possibly member left the guild)")
+      return
+    }
+    
+    val effectiveName = sanitizeName(member.getEffectiveName)
     val message = (sanitizeMessage(event.getMessage.getContentDisplay) +: event.getMessage.getAttachments.asScala.map(_.getUrl))
       .filter(_.nonEmpty)
       .mkString(" ")
