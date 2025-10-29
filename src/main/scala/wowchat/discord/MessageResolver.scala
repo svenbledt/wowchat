@@ -63,7 +63,7 @@ class MessageResolver(jda: JDA) {
 
   def resolveTags(discordChannel: TextChannel, message: String, onError: String => Unit): String = {
     // OR non-capturing regex didn't work for these for some reason
-    val regexes = Seq("\"@(.+?)\"", "@([\\w]+)").map(_.r)
+    val regexes = Seq("\"@(.+?)\"", "@([\\w.]+)").map(_.r)
 
     val scalaMembers = discordChannel.getMembers.asScala
       // you don't want to tag yourself
