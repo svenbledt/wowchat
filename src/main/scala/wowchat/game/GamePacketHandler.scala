@@ -101,8 +101,14 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
       if (announcementConfig.enabled) {
         executorService.scheduleWithFixedDelay(() => {
           if (inWorld && guildGuid != 0) {
-            sendMessageToWow(ChatEvents.CHAT_MSG_GUILD, announcementConfig.message, None)
-            logger.debug(s"Sent hourly announcement: ${announcementConfig.message}")
+            // Unescape common escape sequences (e.g., don\'t -> don't)
+            // Order matters: handle double backslashes first, then single escapes
+            val unescapedMessage = announcementConfig.message
+              .replace("\\\\", "\\")
+              .replace("\\'", "'")
+              .replace("\\\"", "\"")
+            sendMessageToWow(ChatEvents.CHAT_MSG_GUILD, unescapedMessage, None)
+            logger.debug(s"Sent hourly announcement: $unescapedMessage")
           }
         }, 0, 1, TimeUnit.HOURS)
       }
