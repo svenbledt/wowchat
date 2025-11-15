@@ -96,6 +96,19 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
     }, 61, 61, TimeUnit.SECONDS)
   }
 
+  private def runHourlyAnnouncementExecutor: Unit = {
+    Global.config.guildConfig.hourlyAnnouncement.foreach(announcementConfig => {
+      if (announcementConfig.enabled) {
+        executorService.scheduleWithFixedDelay(() => {
+          if (inWorld && guildGuid != 0) {
+            sendMessageToWow(ChatEvents.CHAT_MSG_GUILD, announcementConfig.message, None)
+            logger.debug(s"Sent hourly announcement: ${announcementConfig.message}")
+          }
+        }, 0, 1, TimeUnit.HOURS)
+      }
+    })
+  }
+
   def buildGuildiesOnline: String = {
     val characterName = Global.config.wow.character
 
@@ -421,6 +434,7 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
     gameEventCallback.connected
     runKeepAliveExecutor
     runGuildRosterExecutor
+    runHourlyAnnouncementExecutor
     if (guildGuid != 0) {
       queryGuildName
       updateGuildRoster

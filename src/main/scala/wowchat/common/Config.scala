@@ -15,10 +15,11 @@ case class WowChatConfig(discord: DiscordConfig, wow: Wow, guildConfig: GuildCon
 case class DiscordConfig(token: String, enableDotCommands: Boolean, dotCommandsWhitelist: Set[String], enableCommandsChannels: Set[String], enableTagFailedNotifications: Boolean, itemDatabase: Option[String])
 case class Wow(locale: String, platform: Platform.Value, realmBuild: Option[Int], gameBuild: Option[Int], realmlist: RealmListConfig, account: Array[Byte], password: String, character: String, enableServerMotd: Boolean)
 case class RealmListConfig(name: String, host: String, port: Int)
-case class GuildConfig(notificationConfigs: Map[String, GuildNotificationConfig], roleSyncConfig: Option[GuildRoleSyncConfig], welcomeMessage: Option[WelcomeMessageConfig])
+case class GuildConfig(notificationConfigs: Map[String, GuildNotificationConfig], roleSyncConfig: Option[GuildRoleSyncConfig], welcomeMessage: Option[WelcomeMessageConfig], hourlyAnnouncement: Option[HourlyAnnouncementConfig])
 case class GuildNotificationConfig(enabled: Boolean, format: String, channel: Option[String])
 case class GuildRoleSyncConfig(enabled: Boolean, roleId: Option[String], pattern: String)
 case class WelcomeMessageConfig(enabled: Boolean, message: String, minLevel: Int = 10)
+case class HourlyAnnouncementConfig(enabled: Boolean, message: String)
 case class ChannelConfig(chatDirection: ChatDirection, wow: WowChannelConfig, discord: DiscordChannelConfig)
 case class WowChannelConfig(id: Option[Int], tp: Byte, channel: Option[String] = None, format: String, filters: Option[FiltersConfig])
 case class DiscordChannelConfig(channel: String, format: String, filters: Option[FiltersConfig])
@@ -145,7 +146,7 @@ object WowChatConfig extends GamePackets {
     guildConf.fold({
       GuildConfig(defaults.mapValues {
         case (enabled, format) => GuildNotificationConfig(enabled, format, None)
-      }, None, None)
+      }, None, None, None)
     })(guildConf => {
       val roleSyncConf = getConfigOpt(guildConf, "role_sync").map(conf => {
         GuildRoleSyncConfig(
@@ -162,6 +163,12 @@ object WowChatConfig extends GamePackets {
         WelcomeMessageConfig(enabled, message, minLevel)
       })
       
+      val hourlyAnnouncementConf = getConfigOpt(guildConf, "hourly_announcement").map(conf => {
+        val enabled = getOpt[Boolean](conf, "enabled").getOrElse(false)
+        val message = getOpt[String](conf, "message").getOrElse("Please don't forget to join our discord. The invite link you can find here https://discord.gg/blablabla")
+        HourlyAnnouncementConfig(enabled, message)
+      })
+      
       val gConfig = GuildConfig(
         defaults.keysIterator.map(key => {
           val conf = getConfigOpt(guildConf, key)
@@ -176,7 +183,8 @@ object WowChatConfig extends GamePackets {
         })
           .toMap,
         roleSyncConf,
-        welcomeMsgConf
+        welcomeMsgConf,
+        hourlyAnnouncementConf
       )
       gConfig
     })
