@@ -152,7 +152,7 @@ object WowChatConfig extends GamePackets {
         GuildRoleSyncConfig(
           getOpt[Boolean](conf, "enabled").getOrElse(false),
           getOpt[String](conf, "role_id"),
-          getOpt[String](conf, "pattern").getOrElse("(?:^|(?<=\\s))@?([a-zA-Z0-9_.]{2,32})(?=$|\\s)")
+          getOpt[String](conf, "pattern").getOrElse("(?:^|(?<=\\s))@?([a-zA-Z0-9_.]{2,80})(?=$|\\s)")
         )
       })
       
