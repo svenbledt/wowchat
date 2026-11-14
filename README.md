@@ -27,9 +27,10 @@ Features:
 * Smart Tagging
   * Tag players on Discord from WoW using @and_part_or_all_of_their_name.
   * You can also tag @here and @everyone and "@Even Roles With Spaces" (include quotes around them).
-* Custom commands
+* Custom commands (slash commands `/who`, `/online`, `/gmotd`, or the classic `?who`, `?online`, `?gmotd`)
   * Check who is online in your guild
   * Query other players in the world
+  * Results are shown as Discord Components V2 cards
 * Runs as a Java program, and therefore works on Windows, Mac, and Linux.
 
 ## How it works
@@ -110,8 +111,9 @@ Even though this bot does not do anything malicious, some servers may not like a
 
 3. Invite your bot to Discord
    * Go back to https://discordapp.com/developers/applications/ and click your new Bot application.
-   * In browser enter: https://discordapp.com/oauth2/authorize?client_id=CLIENT_ID&scope=bot
+   * In browser enter: https://discordapp.com/oauth2/authorize?client_id=CLIENT_ID&scope=bot+applications.commands
      * Replace **CLIENT_ID** with the value from Discord applications page.
+     * The `applications.commands` scope is needed for the slash commands. A bot that was invited with only `bot` can be re-invited with this link without kicking it first.
    * Setup the bot with the correct Discord roles/permissions to enter your desired channels.
 
 ## Run

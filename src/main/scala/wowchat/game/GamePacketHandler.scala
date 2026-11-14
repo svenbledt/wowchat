@@ -9,7 +9,8 @@ import com.typesafe.scalalogging.StrictLogging
 import io.netty.buffer.{ByteBuf, PooledByteBufAllocator}
 import io.netty.channel.{ChannelFuture, ChannelHandlerContext, ChannelInboundHandlerAdapter}
 import wowchat.commands.{CommandHandler, WhoResponse}
-import wowchat.discord.Discord
+import wowchat.discord.{Discord, WhoMessages}
+import net.dv8tion.jda.api.components.container.Container
 
 import scala.collection.mutable
 import scala.collection.mutable.ListBuffer
@@ -127,6 +128,19 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
         s"${m.name} (${m.level} ${Classes.valueOf(m.charClass)} in ${GameResources.AREA.getOrElse(m.zoneId, "Unknown Zone")})"
       })
       .mkString(getGuildiesOnlineMessage(false), ", ", "")
+  }
+
+  override def buildGuildiesOnlineMessages: Seq[Container] = {
+    val characterName = Global.config.wow.character
+
+    val members = guildRoster
+      .valuesIterator
+      .filter(guildMember => guildMember.isOnline && !guildMember.name.equalsIgnoreCase(characterName))
+      .toSeq
+      .sortBy(_.name)
+      .map(m => m -> Classes.valueOf(m.charClass))
+
+    WhoMessages.guildOnline(Option(guildInfo).map(_.name), members)
   }
 
   def getGuildiesOnlineMessage(isStatus: Boolean): String = {
@@ -725,23 +739,23 @@ class GamePacketHandler(realmId: Int, realmName: String, sessionKey: Array[Byte]
         )
         if (approximateMatches.isEmpty) {
           // No approximate matches found.
-          Discord.sendMessage(CommandHandler.whoRequest.messageChannel, s"No player named ${CommandHandler.whoRequest.playerName} is currently playing.")
+          CommandHandler.whoRequest.reply(Seq(WhoMessages.notFound(CommandHandler.whoRequest.playerName)))
         } else {
           // Send at most 3 approximate matches.
-          approximateMatches.take(3).foreach(Discord.sendMessage(CommandHandler.whoRequest.messageChannel, _))
+          CommandHandler.whoRequest.reply(approximateMatches.take(3))
         }
       } else {
         // Approximate matches found online!
         displayResults.take(3).foreach(whoResponse => {
-          CommandHandler.handleWhoResponse(Some(whoResponse),
+          CommandHandler.whoRequest.reply(CommandHandler.handleWhoResponse(Some(whoResponse),
             guildInfo,
             guildRoster,
             guildMember => guildMember.name.equalsIgnoreCase(CommandHandler.whoRequest.playerName)
-          ).foreach(Discord.sendMessage(CommandHandler.whoRequest.messageChannel, _))
+          ))
         })
       }
     } else {
-      handledResponses.foreach(Discord.sendMessage(CommandHandler.whoRequest.messageChannel, _))
+      CommandHandler.whoRequest.reply(handledResponses)
     }
   }
 

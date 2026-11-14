@@ -6,11 +6,13 @@ import com.typesafe.scalalogging.StrictLogging
 import com.vdurmont.emoji.EmojiParser
 import net.dv8tion.jda.api.JDABuilder
 import net.dv8tion.jda.api.JDA.Status
+import net.dv8tion.jda.api.components.container.Container
 import net.dv8tion.jda.api.entities.{Activity, MessageType}
 import net.dv8tion.jda.api.entities.Activity.ActivityType
 import net.dv8tion.jda.api.entities.channel.ChannelType
 import net.dv8tion.jda.api.entities.channel.middleman.MessageChannel
 import net.dv8tion.jda.api.events.StatusChangeEvent
+import net.dv8tion.jda.api.events.interaction.command.SlashCommandInteractionEvent
 import net.dv8tion.jda.api.events.message.MessageReceivedEvent
 import net.dv8tion.jda.api.events.session.ShutdownEvent
 import net.dv8tion.jda.api.hooks.ListenerAdapter
@@ -26,6 +28,11 @@ object Discord {
 
   def sendMessage(channel: MessageChannel, message: String): Unit = {
     splitUpByLength(message, 2000).foreach(channel.sendMessage(_).queue)
+  }
+
+  // Sends each container as its own Components V2 message (keeps each under the 4000 character limit)
+  def sendComponents(channel: MessageChannel, containers: Iterable[Container]): Unit = {
+    containers.foreach(channel.sendMessageComponents(_).useComponentsV2().queue)
   }
 
   private def splitUpByLength(message: String, maxLength: Int): Seq[String] = {
@@ -267,6 +274,7 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
     event.getNewStatus match {
       case Status.CONNECTED =>
         lastStatus.foreach(game => changeStatus(game.getType, game.getName))
+        registerSlashCommands
         // this is a race condition if already connected to wow, reconnect to discord, and bot tries to send
         // wow->discord message. alternatively it was throwing already garbage collected exceptions if trying
         // to use the previous connection's channel references. I guess need to refill these maps on discord reconnection
@@ -354,6 +362,37 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
     }
   }
 
+  private var slashCommandsRegistered = false
+
+  // Per-server registration so the commands appear immediately (global commands can take up to an hour).
+  // Only once per start: CONNECTED also fires on every reconnect.
+  private def registerSlashCommands: Unit = {
+    if (slashCommandsRegistered) {
+      return
+    }
+    slashCommandsRegistered = true
+    jda.getGuilds.asScala.foreach(guild => {
+      guild.updateCommands().addCommands(CommandHandler.slashCommands.asJava).queue(
+        _ => logger.info(s"Registered slash commands in Discord server ${guild.getName}"),
+        error => logger.error(s"Failed to register slash commands in Discord server ${guild.getName} " +
+          s"(was the bot invited with the applications.commands scope?): ${error.getMessage}")
+      )
+    })
+  }
+
+  override def onSlashCommandInteraction(event: SlashCommandInteractionEvent): Unit = {
+    if (!event.isFromGuild) {
+      event.reply("Commands only work in a server.").setEphemeral(true).queue()
+      return
+    }
+    try {
+      CommandHandler.handleSlashCommand(event)
+    } catch {
+      case e: Exception =>
+        logger.error(s"Error handling slash command /${event.getName}", e)
+    }
+  }
+
   override def onShutdown(event: ShutdownEvent): Unit = {
     event.getCloseCode match {
       case CloseCode.DISALLOWED_INTENTS =>
@@ -399,13 +438,12 @@ class Discord(discordConnectionCallback: CommonConnectionCallback) extends Liste
     val message = (sanitizeMessage(event.getMessage.getContentDisplay) +: event.getMessage.getAttachments.asScala.map(_.getUrl))
       .filter(_.nonEmpty)
       .mkString(" ")
-    val enableCommandsChannels = Global.config.discord.enableCommandsChannels
     logger.debug(s"RECV DISCORD MESSAGE: [${channel.getName}] [$effectiveName]: $message")
     if (message.isEmpty) {
       logger.error(s"Received a message in channel ${channel.getName} but the content was empty. You likely forgot to enable MESSAGE CONTENT INTENT for your bot in the Discord Developers portal.")
     }
 
-    if ((enableCommandsChannels.nonEmpty && !enableCommandsChannels.contains(channelName)) || !CommandHandler(channel, message)) {
+    if (!CommandHandler.isCommandChannel(channelName) || !CommandHandler(channel, message)) {
       // send to all configured wow channels
       Global.discordToWow
         .get(channelName)
