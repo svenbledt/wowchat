@@ -193,6 +193,8 @@ object WowChatConfig extends GamePackets {
   private def parseChannels(channelsConf: Config): Seq[ChannelConfig] = {
     channelsConf.getObjectList("channels").asScala
       .map(_.toConfig)
+      // Channels can be switched off with enabled=0 (defaults to enabled when not set)
+      .filter(channel => getOpt[Boolean](channel, "enabled").getOrElse(true))
       .map(channel => {
         val wowChannel = getOpt[String](channel, "wow.channel")
 
