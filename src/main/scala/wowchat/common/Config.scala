@@ -50,7 +50,7 @@ object WowChatConfig extends GamePackets {
 
     WowChatConfig(
       DiscordConfig(
-        discordConf.getString("token"),
+        resolveToken(getOpt[String](discordConf, "token_base64"), getOpt[String](discordConf, "token")),
         getOpt[Boolean](discordConf, "enable_dot_commands").getOrElse(true),
         getOpt[util.List[String]](discordConf, "dot_commands_whitelist")
           .getOrElse(new util.ArrayList[String]()).asScala.map(_.toLowerCase).toSet,
@@ -221,6 +221,45 @@ object WowChatConfig extends GamePackets {
         getOpt[util.List[String]](config, "patterns").getOrElse(new util.ArrayList[String]()).asScala
       )
     })
+  }
+
+  // Strip whitespace and surrounding quotes (e.g. DISCORD_TOKEN="abc" passed through literally)
+  private def stripQuotes(raw: String): String = {
+    var value = raw.trim
+    while (value.length >= 2 &&
+      ((value.startsWith("\"") && value.endsWith("\"")) || (value.startsWith("'") && value.endsWith("'")))) {
+      value = value.substring(1, value.length - 1).trim
+    }
+    value
+  }
+
+  // Prefer DISCORD_TOKEN_BASE64 (decoded) when set, otherwise fall back to the plain DISCORD_TOKEN
+  private def resolveToken(base64Token: Option[String], plainToken: Option[String]): String = {
+    val encoded = base64Token.map(stripQuotes).filter(_.nonEmpty)
+    val token = encoded match {
+      case Some(value) =>
+        val bytes = try {
+          java.util.Base64.getDecoder.decode(value)
+        } catch {
+          case _: IllegalArgumentException =>
+            try {
+              java.util.Base64.getUrlDecoder.decode(value)
+            } catch {
+              case e: IllegalArgumentException =>
+                throw new IllegalArgumentException(s"DISCORD_TOKEN_BASE64 is not valid base64: ${e.getMessage}")
+            }
+        }
+        // trim also removes the trailing newline added by `echo token | base64`
+        stripQuotes(new String(bytes, java.nio.charset.StandardCharsets.UTF_8))
+      case None =>
+        plainToken.map(stripQuotes).getOrElse("")
+    }
+
+    if (token.isEmpty) {
+      throw new IllegalArgumentException(
+        "Discord token is empty. Set DISCORD_TOKEN_BASE64 (base64-encoded token) or DISCORD_TOKEN in your deployment.")
+    }
+    token
   }
 
   private def getConfigOpt(cfg: Config, path: String): Option[Config] = {

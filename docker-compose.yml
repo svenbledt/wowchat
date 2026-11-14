@@ -10,6 +10,8 @@ services:
     environment:
       # Discord Configuration
       - DISCORD_TOKEN=${DISCORD_TOKEN}
+      # Base64-encoded token; takes precedence over DISCORD_TOKEN when set
+      - DISCORD_TOKEN_BASE64=${DISCORD_TOKEN_BASE64}
       - GUILD_CHAT_CHANNEL_ID=${GUILD_CHAT_CHANNEL_ID}
       - OFFICER_CHAT_CHANNEL_ID=${OFFICER_CHAT_CHANNEL_ID}
       - GUILD_ROLE_SYNC_ENABLED=${GUILD_ROLE_SYNC_ENABLED}
