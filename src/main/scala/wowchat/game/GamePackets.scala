@@ -163,6 +163,32 @@ trait GamePackets {
     val CLASS_MONK = 0x0A
     val CLASS_DRUID = 0x0B
 
+    // Conquest of Azeroth's 21 classes (ChrClasses.dbc IDs 12-32, enUS display names from the CoA client).
+    // Only used when WOW_VERSION=coa.
+    private val coaClasses: Map[Int, String] = Map(
+      12 -> "Barbarian",
+      13 -> "Witch Doctor",
+      14 -> "Felsworn",
+      15 -> "Witch Hunter",
+      16 -> "Stormbringer",
+      17 -> "Knight of Xoroth",
+      18 -> "Guardian",
+      19 -> "Templar",
+      20 -> "Bloodmage",
+      21 -> "Ranger",
+      22 -> "Chronomancer",
+      23 -> "Necromancer",
+      24 -> "Pyromancer",
+      25 -> "Cultist",
+      26 -> "Starcaller",
+      27 -> "Sun Cleric",
+      28 -> "Tinker",
+      29 -> "Venomancer",
+      30 -> "Reaper",
+      31 -> "Primalist",
+      32 -> "Runemaster"
+    )
+
     def valueOf(charClass: Byte): String = {
       charClass match {
         case CLASS_WARRIOR => "Warrior"
@@ -174,8 +200,10 @@ trait GamePackets {
         case CLASS_SHAMAN => "Shaman"
         case CLASS_MAGE => "Mage"
         case CLASS_WARLOCK => "Warlock"
-        case CLASS_MONK => "Monk"
+        // ID 10 is Monk in MoP; it is not a playable class before MoP (CoA included)
+        case CLASS_MONK => if (WowChatConfig.getExpansion == WowExpansion.MoP) "Monk" else "Unknown"
         case CLASS_DRUID => "Druid"
+        case other if WowChatConfig.isCoa => coaClasses.getOrElse(other & 0xFF, "Unknown")
         case _ => "Unknown"
       }
     }

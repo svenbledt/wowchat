@@ -1,6 +1,6 @@
 # Multi-stage build for WoWChat
 # Stage 1: Build the application
-FROM maven:3.8-openjdk-11 AS builder
+FROM maven:3.9-eclipse-temurin-11 AS builder
 
 # Set working directory
 WORKDIR /build
@@ -28,6 +28,9 @@ COPY --from=builder /build/target/classes/logback.xml ./
 
 # Copy configuration file (can be overridden with volume mount in Coolify)
 COPY src/main/resources/wowchat.conf ./wowchat.conf
+
+# Size the JVM heap relative to the container memory limit (picked up automatically by the JVM)
+ENV JAVA_TOOL_OPTIONS="-XX:MaxRAMPercentage=75.0"
 
 # Environment variables for configuration
 # These should be set in Coolify's environment variables section

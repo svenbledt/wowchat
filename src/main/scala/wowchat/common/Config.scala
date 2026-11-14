@@ -12,7 +12,7 @@ import scala.collection.JavaConverters._
 import scala.reflect.runtime.universe.{TypeTag, typeOf}
 
 case class WowChatConfig(discord: DiscordConfig, wow: Wow, guildConfig: GuildConfig, channels: Seq[ChannelConfig], filters: Option[FiltersConfig])
-case class DiscordConfig(token: String, enableDotCommands: Boolean, dotCommandsWhitelist: Set[String], enableCommandsChannels: Set[String], enableTagFailedNotifications: Boolean, itemDatabase: Option[String])
+case class DiscordConfig(token: String, enableDotCommands: Boolean, dotCommandsWhitelist: Set[String], enableCommandsChannels: Set[String], enableTagFailedNotifications: Boolean, itemDatabase: Option[String], linkUrls: Map[String, String] = Map.empty)
 case class Wow(locale: String, platform: Platform.Value, realmBuild: Option[Int], gameBuild: Option[Int], realmlist: RealmListConfig, account: Array[Byte], password: String, character: String, enableServerMotd: Boolean)
 case class RealmListConfig(name: String, host: String, port: Int)
 case class GuildConfig(notificationConfigs: Map[String, GuildNotificationConfig], roleSyncConfig: Option[GuildRoleSyncConfig], welcomeMessage: Option[WelcomeMessageConfig], hourlyAnnouncement: Option[HourlyAnnouncementConfig])
@@ -29,6 +29,7 @@ object WowChatConfig extends GamePackets {
 
   private var version: String = _
   private var expansion: WowExpansion = _
+  private var coa: Boolean = false
 
   def apply(confFile: String): WowChatConfig = {
     val file = new File(confFile)
@@ -45,7 +46,10 @@ object WowChatConfig extends GamePackets {
     val filtersConf = getConfigOpt(config, "filters")
 
     // we gotta load this first to initialize constants that change between versions :OMEGALUL:
-    version = getOpt(wowConf, "version").getOrElse("1.12.1")
+    val configuredVersion = getOpt[String](wowConf, "version").map(stripQuotes).getOrElse("1.12.1")
+    // "coa" = Conquest of Azeroth: a 3.3.5a (12340) client with CoA-specific data such as its custom classes
+    coa = configuredVersion.equalsIgnoreCase("coa")
+    version = if (coa) "3.3.5" else configuredVersion
     expansion = WowExpansion.valueOf(version)
 
     WowChatConfig(
@@ -57,7 +61,8 @@ object WowChatConfig extends GamePackets {
         getOpt[util.List[String]](discordConf, "enable_commands_channels")
           .getOrElse(new util.ArrayList[String]()).asScala.map(_.toLowerCase).toSet,
         getOpt[Boolean](discordConf, "enable_tag_failed_notifications").getOrElse(true),
-        getOpt[String](discordConf, "item_database")
+        getOpt[String](discordConf, "item_database").map(stripQuotes),
+        parseLinkUrls(getConfigOpt(discordConf, "link_urls"))
       ),
       Wow(
         getOpt[String](wowConf, "locale").getOrElse("enUS"),
@@ -78,6 +83,7 @@ object WowChatConfig extends GamePackets {
 
   lazy val getVersion = version
   lazy val getExpansion = expansion
+  lazy val isCoa = coa
 
   private lazy val buildFromVersion: Int =
     version match {
@@ -222,6 +228,16 @@ object WowChatConfig extends GamePackets {
         getOpt[Boolean](config, "enabled").getOrElse(false),
         getOpt[util.List[String]](config, "patterns").getOrElse(new util.ArrayList[String]()).asScala
       )
+    })
+  }
+
+  // Per link type URL templates ({id} is replaced with the item/spell/quest/achievement ID).
+  // Empty or unset entries are dropped so the resolver falls back to item_database.
+  private def parseLinkUrls(linkUrlsConf: Option[Config]): Map[String, String] = {
+    linkUrlsConf.fold(Map.empty[String, String])(conf => {
+      Seq("item", "spell", "quest", "achievement")
+        .flatMap(linkType => getOpt[String](conf, linkType).map(stripQuotes).filter(_.nonEmpty).map(linkType -> _))
+        .toMap
     })
   }
 

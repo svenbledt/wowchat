@@ -30,6 +30,12 @@ services:
 
       - WOW_PLATFORM=${WOW_PLATFORM:-Mac}
       - ITEM_DATABASE=${ITEM_DATABASE:-"https://www.wowhead.com/wotlk/"}
+      # Optional link URL templates per type, {id} = linked ID (e.g. https://coa-development.org/items/{id})
+      # Unset types fall back to ITEM_DATABASE
+      - LINK_URL_ITEM=${LINK_URL_ITEM}
+      - LINK_URL_SPELL=${LINK_URL_SPELL}
+      - LINK_URL_QUEST=${LINK_URL_QUEST}
+      - LINK_URL_ACHIEVEMENT=${LINK_URL_ACHIEVEMENT}
       # WoW Server Configuration
       - WOW_VERSION=${WOW_VERSION:-3.3.5}
       - WOW_REALMLIST=${WOW_REALMLIST:-logon.stormforge.gg}

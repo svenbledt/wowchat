@@ -7,6 +7,7 @@ import wowchat.game.GameResources
 
 import scala.collection.JavaConverters._
 import scala.collection.mutable
+import scala.util.matching.Regex
 
 object MessageResolver {
 
@@ -39,18 +40,26 @@ class MessageResolver(jda: JDA) {
     }
   })
 
+  // Uses the configured template for this link type (discord.link_urls, e.g. LINK_URL_ITEM),
+  // otherwise falls back to the item_database site with ?type=id
+  private def linkUrl(linkType: String, id: String): String = {
+    Global.config.discord.linkUrls.get(linkType)
+      .map(_.replace("{id}", id))
+      .getOrElse(s"$linkSite?$linkType=$id")
+  }
+
   def resolveLinks(message: String): String = {
     linkRegexes.foldLeft(message) {
-      case (result, (classicDbKey, regex)) =>
+      case (result, (linkType, regex)) =>
         regex.replaceAllIn(result, m => {
-          s"[[${m.group(2)}]]($linkSite?$classicDbKey=${m.group(1)})"
+          Regex.quoteReplacement(s"[[${m.group(2)}]](${linkUrl(linkType, m.group(1))})")
         })
     }
   }
 
   def resolveAchievementId(achievementId: Int): String = {
     val name = GameResources.ACHIEVEMENT.getOrElse(achievementId, achievementId)
-    s"[[$name]]($linkSite?achievement=$achievementId)"
+    s"[[$name]](${linkUrl("achievement", achievementId.toString)})"
   }
 
   def stripColorCoding(message: String): String = {

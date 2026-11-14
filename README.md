@@ -125,7 +125,7 @@ Even though this bot does not do anything malicious, some servers may not like a
 - `OFFICER_CHAT_CHANNEL_ID` - Discord channel for officer chat
 - `WOW_PLATFORM` - Platform to run on: Windows / Mac
 - `ITEM_DATABASE` - The Database to get item data from
-- `WOW_VERSION` - Server version (1.12.1, 2.4.3, 3.3.5, 4.3.4, or 5.4.8)
+- `WOW_VERSION` - Server version (1.12.1, 2.4.3, 3.3.5, 4.3.4, or 5.4.8; `coa` for Conquest of Azeroth, which connects as 3.3.5a and shows CoA class names)
 - `WOW_REALMLIST` - Server address (e.g., logon.server.com)
 - `WOW_REALM` - Exact realm name from character selection
 - `WOW_ACCOUNT` - Bot account username
